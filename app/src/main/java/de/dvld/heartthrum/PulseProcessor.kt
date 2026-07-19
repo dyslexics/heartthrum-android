@@ -29,7 +29,10 @@ class PulseProcessor {
     }
 
     fun process(time: Double, r: Double, g: Double, b: Double): Output {
-        val fingerDetected = r > 0.4 && b < 0.35 && r > b * 1.8
+        // Red-dominance ratio: works in darkness AND daylight (ambient light
+        // leaking around the fingertip adds green/blue in bright rooms).
+        val dominance = r / max(0.01, max(g, b))
+        val fingerDetected = r > 0.18 && dominance > 1.35
         green.add(time, g)
         red.add(time, r)
         val best = if (green.score >= red.score) green else red
