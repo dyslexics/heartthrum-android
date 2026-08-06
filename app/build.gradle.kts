@@ -7,13 +7,13 @@ plugins {
 
 android {
     namespace = "de.dvld.heartthrum"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "de.dvld.heartthrum"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 2
+        targetSdk = 36
+        versionCode = 3
         versionName = "1.0"
     }
 
