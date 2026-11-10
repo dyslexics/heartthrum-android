@@ -24,17 +24,20 @@ class CameraController(private val context: Context) {
     private var camera: Camera? = null
     private var provider: ProcessCameraProvider? = null
     private val executor = Executors.newSingleThreadExecutor()
+    @Volatile private var generation = 0L
 
     fun start(owner: LifecycleOwner) {
+        val session = ++generation
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener({
+            if (session != generation) return@addListener
             provider = future.get()
             val analysis = ImageAnalysis.Builder()
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .setTargetResolution(Size(320, 240))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
-            analysis.setAnalyzer(executor) { analyze(it) }
+            analysis.setAnalyzer(executor) { analyze(it, session) }
             provider?.unbindAll()
             camera = provider?.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, analysis)
             camera?.cameraControl?.enableTorch(true)
@@ -42,6 +45,7 @@ class CameraController(private val context: Context) {
     }
 
     fun stop() {
+        generation++
         camera?.cameraControl?.enableTorch(false)
         unlockExposure()
         provider?.unbindAll()
@@ -65,8 +69,9 @@ class CameraController(private val context: Context) {
             CaptureRequestOptions.Builder().build()
     }
 
-    private fun analyze(image: ImageProxy) {
+    private fun analyze(image: ImageProxy, session: Long) {
         try {
+            if (session != generation) return
             val plane = image.planes[0]
             val buf = plane.buffer
             val stride = plane.rowStride
@@ -89,7 +94,9 @@ class CameraController(private val context: Context) {
                 y += 4
             }
             val t = image.imageInfo.timestamp / 1e9
-            if (n > 0) onSample?.invoke(t, r / n / 255.0, g / n / 255.0, b / n / 255.0)
+            if (n > 0 && session == generation) {
+                onSample?.invoke(t, r / n / 255.0, g / n / 255.0, b / n / 255.0)
+            }
         } finally {
             image.close()
         }
